@@ -24,6 +24,21 @@ import mimetypes
 #
 # http://docs.python.org/2/library/socketserver.html
 #
+
+# Copyright 2021 Li Shang
+
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS,
+#    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#    See the License for the specific language governing permissions and
+#    limitations under the License.
+
 # run: python freetests.py
 
 # try: curl -v -X GET http://127.0.0.1:8080/
@@ -35,16 +50,14 @@ class MyWebServer(socketserver.BaseRequestHandler):
         self.data = self.request.recv(1024).strip()
         # print("Got a request of: %s\n" % self.data)
 
+        host = "http://127.0.0.1:8080/"
+
         # decode request string
         decode_string = self.data.decode('utf-8')
         # split decoded string
         split_string = decode_string.split('\r\n')
-        # print("decode-string: ", split_string)
-        # get host address
-        host = "http://" + split_string[1].split()[1]
-        # print("host: ", host)
+
         request = split_string[0].split()
-        # print("request: ", request)
 
         # handle request
         if request[0] == 'GET':
@@ -52,6 +65,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
             path = './www' + request[1]
             path_ending = path[-1]
             # collapse path
+            # https://docs.python.org/3/library/os.path.html#os.path.normpath
             path = os.path.normpath(path)
             # https://www.guru99.com/python-check-if-file-exists.html
             # check if path exists and is under ./wwww
@@ -60,28 +74,14 @@ class MyWebServer(socketserver.BaseRequestHandler):
                 if os.path.isdir(path):
                     if path_ending == '/':
                         new_path = path + '/index.html'
-                        f = open(new_path, 'r')
-                        page = f.read()
-                        f.close()
-                        self.request.sendall(bytearray(
-                            "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n"+page, 'utf-8'))
+                        self.okResponse(new_path)
                     else:
                         new_path = host + request[1] + '/'
                         self.request.sendall(bytearray(
                             "HTTP/1.1 301 Moved Permanently\r\nContent-Type: text/plain\r\nRedirect to " + new_path + "\r\nLocation: " + new_path, 'utf-8'))
-                elif os.path.isfile(path):
-                    # path is a file
-                    # get mime type of file
-                    # https://www.tutorialspoint.com/How-to-find-the-mime-type-of-a-file-in-Python
-                    mimetype = mimetypes.MimeTypes().guess_type(path)[0]
-                    f = open(path, 'r')
-                    page = f.read()
-                    f.close()
-                    self.request.sendall(bytearray(
-                        "HTTP/1.1 200 OK\r\nContent-Type: " + mimetype + "\r\n\r\n"+page, 'utf-8'))
                 else:
-                    self.request.sendall(
-                    bytearray("HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\n\r\nPath Not Found :(", 'utf-8'))
+                    # path is a file
+                    self.okResponse(path)
             else:
                 self.request.sendall(
                     bytearray("HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\n\r\nPath Not Found :(", 'utf-8'))
@@ -90,6 +90,14 @@ class MyWebServer(socketserver.BaseRequestHandler):
             self.request.sendall(
                 bytearray("HTTP/1.1 405 Method Not Allowed\r\nContent-Type: text/plain\r\nMethod Not Allowed :(", 'utf-8'))
 
+    def okResponse(self, path):
+        # get mime type of file
+        # https://www.tutorialspoint.com/How-to-find-the-mime-type-of-a-file-in-Python
+        mimetype = mimetypes.MimeTypes().guess_type(path)[0]
+        f = open(path, 'r')
+        page = f.read()
+        f.close()
+        self.request.sendall(bytearray("HTTP/1.1 200 OK\r\nContent-Type: " + mimetype + "\r\n\r\n"+page, 'utf-8'))
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080
